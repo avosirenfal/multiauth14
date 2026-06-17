@@ -1,0 +1,69 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build ${{ matrix.target_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # linux
+          - os: ubuntu-latest
+            nix_target: multiauth14
+            target_name: multiauth14-x86_64-linux
+
+          # windows
+          - os: ubuntu-latest
+            nix_target: multiauth14-windows
+            target_name: multiauth14-x86_64-windows.exe
+
+          # macos intel (x86_64)
+          - os: macos-13
+            nix_target: multiauth14
+            target_name: multiauth14-x86_64-darwin
+
+          # macos apple silicon (aarch64)
+          - os: macos-14
+            nix_target: multiauth14
+            target_name: multiauth14-aarch64-darwin
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Build
+        run: nix build .#${{ matrix.nix_target }}
+
+      - name: Rename and move binary
+        run: |
+          mkdir -p out
+          cp result/bin/* out/${{ matrix.target_name }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target_name }}
+          path: out/${{ matrix.target_name }}
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
