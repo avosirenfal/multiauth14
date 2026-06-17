@@ -29,9 +29,9 @@ jobs:
             target_name: multiauth14-x86_64-windows.exe
 
           # macos intel (x86_64)
-          - os: macos-13
-            nix_target: multiauth14
-            target_name: multiauth14-x86_64-darwin
+#          - os: macos-13
+#            nix_target: multiauth14
+#            target_name: multiauth14-x86_64-darwin
 
           # macos apple silicon (aarch64)
           - os: macos-14
