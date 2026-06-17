@@ -38,7 +38,7 @@ Wizden could have pushed for multi-auth. They also could have pushed Wizden play
 
 Instead, many forks have found themselves forced to choose between Wizden and PJB at the expense of friction and difficulty for their players. Negotiation by gunpoint because mommy and daddy are fighting isn't cool.
 
-Much has been said about PJB, and reasonably so. Very little has been said about Wizden staff repeatedly implying, or saying outright, that the original SS14 infrastructure "isn't safe" with no evidence. I don't think legal threats, misleading statements, and pressure tactics are a great basis for 'fresh start' for SS14.
+Much has been said about PJB, and reasonably so. Very little has been said about Wizden staff repeatedly implying, or saying outright, that the original SS14 infrastructure "isn't safe" with no evidence. I don't think legal threats, misleading statements, and pressure tactics are a great basis for a 'fresh start' for SS14.
 
 SS14 should not be held hostage by whomever happens to hold the keys for critical infrastructure. **Wizden's problems did not start and end with a single person.**
 
