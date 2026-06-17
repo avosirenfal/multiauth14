@@ -6,7 +6,7 @@ use axum::{routing::get, Router};
 use std::sync::Arc;
 
 use crate::auth::{has_joined_handler, ProxyState};
-use crate::config::FaitConfig;
+use crate::config::MulitAuthConfig;
 
 pub async fn start(state: Arc<ProxyState>, hostname: &str, port: u16) {
     let app = Router::new()
@@ -25,7 +25,7 @@ pub async fn start(state: Arc<ProxyState>, hostname: &str, port: u16) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let config: FaitConfig = confy::load_path("config.yaml")?;
+    let config: MulitAuthConfig = confy::load_path("config.yaml")?;
     let proxy_state = Arc::new(ProxyState::new(&config));
     start(proxy_state, &config.host, config.port).await;
     Ok(())

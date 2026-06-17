@@ -7,8 +7,10 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
+use reqwest::Error as ReqwestError;
+use serde_json::Error as SerdeError;
 
-use crate::config::FaitConfig;
+use crate::config::MulitAuthConfig;
 
 pub struct Backend {
     pub url: String,
@@ -21,7 +23,7 @@ pub struct ProxyState {
 }
 
 impl ProxyState {
-    pub fn new(config: &FaitConfig) -> Self {
+    pub fn new(config: &MulitAuthConfig) -> Self {
         let backends = config
             .backends
             .iter()
@@ -45,74 +47,139 @@ pub struct HasJoinedParams {
     pub user_id: String,
 }
 
+pub enum RequestFailure {
+    Reqwest(ReqwestError),
+    ParseError { payload: String, err: SerdeError },
+}
+
+pub enum BackendStatus {
+    Invalid(Value),
+    MissingIsValid(Value),
+    InvalidJson { payload: String, err: String },
+    ReqwestErr(ReqwestError),
+}
+
+impl BackendStatus {
+    fn tag(&self) -> String {
+        match self {
+            Self::Invalid(_) => "invalid".to_string(),
+            Self::MissingIsValid(_) => "bad payload".to_string(),
+            Self::InvalidJson { .. } => "invalid json".to_string(),
+            Self::ReqwestErr(err) => {
+                if err.is_timeout() {
+                    "timed out".to_string()
+                } else if let Some(status) = err.status() {
+                    format!("http {}", status.as_u16())
+                } else {
+                    "network error".to_string()
+                }
+            }
+        }
+    }
+
+    fn print_details(&self, idx: usize, url: &str) {
+        match self {
+            // an explicit isValid: false is normal, so we don't print anything
+            Self::Invalid(_) => {}
+            Self::MissingIsValid(json) => {
+                println!("Backend {} ({}) missing 'isValid'. Payload: {}", idx, url, json);
+            }
+            Self::InvalidJson { payload, err } => {
+                println!("Backend {} ({}) invalid JSON. Error: {}. Payload: {}", idx, url, err, payload);
+            }
+            Self::ReqwestErr(e) => {
+                println!("Backend {} ({}) request failed: {}", idx, url, e);
+            }
+        }
+    }
+}
+
 async fn auth_request(
     client: &reqwest::Client,
     backend_url: &str,
-    semaphore: &Semaphore,
+    semaphore: &tokio::sync::Semaphore,
     hash: &str,
     user_id: &str,
-) -> Result<Value, ()> {
+) -> Result<Value, RequestFailure> {
     let url = format!(
         "{}/api/session/hasJoined?hash={}&userId={}",
-        backend_url,
-        hash,
-        user_id
+        backend_url, hash, user_id
     );
-
-    println!("Doing request: {}", url);
 
     let _ = semaphore.acquire().await.expect("Semaphore closed");
 
+    let res = client.get(&url).send().await.map_err(RequestFailure::Reqwest)?;
+    let raw_text = res.text().await.map_err(RequestFailure::Reqwest)?;
 
-    let res = client.get(&url).send().await.map_err(|e| {
-        eprintln!("Failed to connect to {}: {}", backend_url, e);
-    })?;
-
-    let raw_text = res.text().await.map_err(|e| {
-        eprintln!("Failed to read response text from {}: {}", backend_url, e);
-    })?;
-
-    println!("Raw payload: {}", raw_text);
-
-    let json: Value = serde_json::from_str(&raw_text).map_err(|e| {
-        eprintln!("Failed to parse JSON from {}: {}", backend_url, e);
-    })?;
-
-    // let res = client.get(&url).send().await.map_err(|e| {
-    //     eprintln!("Failed to connect to {}: {}", backend_url, e);
-    // })?;
-    //
-    // let json: Value = res.json().await.map_err(|e| {
-    //     eprintln!("Failed to parse JSON from {}: {}", backend_url, e);
-    // })?;
-
-    Ok(json)
+    serde_json::from_str(&raw_text).map_err(|err| RequestFailure::ParseError {
+        payload: raw_text,
+        err,
+    })
 }
 
 pub async fn has_joined_handler(
     State(proxy_state): State<Arc<ProxyState>>,
     Query(params): Query<HasJoinedParams>,
 ) -> Result<Json<Value>, StatusCode> {
-
+    let total = proxy_state.backends.len();
+    let mut statuses: Vec<(usize, String, BackendStatus)> = Vec::with_capacity(total);
+    /*
+     I don't want to hardcode any assumptions about the payload structure besides isValid
+     so if we fail on all backends we just forward the last auth result along to SS14
+    */
     let mut last_response: Option<Value> = None;
 
-    for backend in &proxy_state.backends {
-        if let Ok(json) = auth_request(&proxy_state.client, &backend.url, &backend.semaphore, &params.hash, &params.user_id).await {
+    for (i, backend) in proxy_state.backends.iter().enumerate() {
+        let backend_num = i + 1;
 
-            let is_valid = json.get("isValid")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
+        let result = auth_request(
+            &proxy_state.client,
+            &backend.url,
+            &backend.semaphore,
+            &params.hash,
+            &params.user_id,
+        )
+            .await;
 
-            if is_valid {
-                println!("Authentication succeeded on backend {}", backend.url);
-                return Ok(Json(json));
-            } else {
-                println!("Authentication failed on backend {}", backend.url);
+        let status = match result {
+            Ok(json) => {
+                if let Some(is_valid) = json.get("isValid").and_then(|v| v.as_bool()) {
+                    if is_valid {
+                        println!(
+                            "Authentication succeeded for {} on backend {}/{} ({})",
+                            params.user_id, backend_num, total, backend.url
+                        );
+                        return Ok(Json(json));
+                    }
+                    last_response = Some(json.clone());
+                    BackendStatus::Invalid(json)
+                } else {
+                    last_response = Some(json.clone());
+                    BackendStatus::MissingIsValid(json)
+                }
             }
+            Err(RequestFailure::ParseError { payload, err }) => {
+                BackendStatus::InvalidJson { payload, err: err.to_string() }
+            }
+            Err(RequestFailure::Reqwest(e)) => BackendStatus::ReqwestErr(e),
+        };
 
-            last_response = Some(json);
-        }
+        status.print_details(backend_num, &backend.url);
+
+        statuses.push((backend_num, backend.url.clone(), status));
     }
+
+    println!(
+        "User {} failed authentication on all backends ({})",
+        params.user_id,
+        statuses
+            .into_iter()
+            .map(|(i, _, stat)| {
+                format!("{}: {}", i, stat.tag())
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     match last_response {
         Some(data) => Ok(Json(data)),

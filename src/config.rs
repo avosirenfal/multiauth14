@@ -1,13 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct FaitConfig {
+pub struct MulitAuthConfig {
     pub host: String,
     pub port: u16,
     pub backends: Vec<String>,
 }
 
-impl Default for FaitConfig {
+impl Default for MulitAuthConfig {
     fn default() -> Self {
         Self {
             host: "localhost".to_string(),
