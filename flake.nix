@@ -51,6 +51,22 @@
           windowsArgs = commonArgs // {
             CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu";
             CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${mingw.stdenv.cc}/bin/x86_64-w64-mingw32-gcc";
+			CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS = "-L native=${mingw.windows.pthreads}/lib";
+
+			TARGET_CC = "${mingw.stdenv.cc}/bin/x86_64-w64-mingw32-gcc";
+            CC_x86_64_pc_windows_gnu = "${mingw.stdenv.cc}/bin/x86_64-w64-mingw32-gcc";
+            CXX_x86_64_pc_windows_gnu = "${mingw.stdenv.cc}/bin/x86_64-w64-mingw32-g++";
+
+            depsBuildBuild = (commonArgs.depsBuildBuild or []) ++ [
+              mingw.stdenv.cc
+            ];
+
+            buildInputs = (commonArgs.buildInputs or []) ++ [
+              mingw.windows.pthreads
+            ];
+
+            # skip check due to cross compilation
+            doCheck = false;
           };
 
           multiauth14-windows = craneLib.buildPackage (windowsArgs // {

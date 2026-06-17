@@ -1,4 +1,5 @@
 .idea
 .direnv
 /target
+result
 config.yaml
