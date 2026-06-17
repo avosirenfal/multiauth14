@@ -10,10 +10,10 @@ use tokio::sync::Semaphore;
 use reqwest::Error as ReqwestError;
 use serde_json::Error as SerdeError;
 
-use crate::config::MulitAuthConfig;
+use crate::config::{BackendDefinition, MulitAuthConfig};
 
 pub struct Backend {
-    pub url: String,
+    pub def: BackendDefinition,
     pub semaphore: Semaphore,
 }
 
@@ -27,8 +27,8 @@ impl ProxyState {
         let backends = config
             .backends
             .iter()
-            .map(|url| Backend {
-                url: url.clone(),
+            .map(|def| Backend {
+                def: def.clone(),
                 semaphore: Semaphore::new(5),
             })
             .collect();
@@ -53,6 +53,7 @@ pub enum RequestFailure {
 }
 
 pub enum BackendStatus {
+    ForbiddenByConfig,
     Invalid(Value),
     MissingIsValid(Value),
     InvalidJson { payload: String, err: String },
@@ -62,6 +63,7 @@ pub enum BackendStatus {
 impl BackendStatus {
     fn tag(&self) -> String {
         match self {
+            Self::ForbiddenByConfig => "forbidden_uuid via config".to_string(),
             Self::Invalid(_) => "invalid".to_string(),
             Self::MissingIsValid(_) => "bad payload".to_string(),
             Self::InvalidJson { .. } => "invalid json".to_string(),
@@ -79,6 +81,8 @@ impl BackendStatus {
 
     fn print_details(&self, idx: usize, url: &str) {
         match self {
+            // no details necessary
+            Self::ForbiddenByConfig => {}
             // an explicit isValid: false is normal, so we don't print anything
             Self::Invalid(_) => {}
             Self::MissingIsValid(json) => {
@@ -132,9 +136,14 @@ pub async fn has_joined_handler(
     for (i, backend) in proxy_state.backends.iter().enumerate() {
         let backend_num = i + 1;
 
+        if backend.def.forbidden_uuids.contains(&params.user_id) {
+            statuses.push((backend_num, backend.def.url.clone(), BackendStatus::ForbiddenByConfig));
+            continue;
+        }
+
         let result = auth_request(
             &proxy_state.client,
-            &backend.url,
+            &backend.def.url,
             &backend.semaphore,
             &params.hash,
             &params.user_id,
@@ -147,7 +156,7 @@ pub async fn has_joined_handler(
                     if is_valid {
                         println!(
                             "Authentication succeeded for {} on backend {}/{} ({})",
-                            params.user_id, backend_num, total, backend.url
+                            params.user_id, backend_num, total, backend.def.url
                         );
                         return Ok(Json(json));
                     }
@@ -164,9 +173,9 @@ pub async fn has_joined_handler(
             Err(RequestFailure::Reqwest(e)) => BackendStatus::ReqwestErr(e),
         };
 
-        status.print_details(backend_num, &backend.url);
+        status.print_details(backend_num, &backend.def.url);
 
-        statuses.push((backend_num, backend.url.clone(), status));
+        statuses.push((backend_num, backend.def.url.clone(), status));
     }
 
     println!(
