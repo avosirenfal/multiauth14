@@ -17,9 +17,9 @@ It is not immediately clear who is responsible for Wizden's new auth infrastruct
 - At this point, some member of Wizden apparently made a copy of the SS14 user database despite their SSH access having been revoked.
 - Not knowing how that was done, PJB considered the servers compromised and shut all SS14 infrastructure down, and restored the servers from clean backups.
 - Wizden claimed PJB "deleted everything". PJB's explanation posts were deleted from the SS14 subreddit. PJB had already left the Wizden Discord of her own accord, days or weeks before.
-- Days later Wizden retracted that claim, but not with an announcement. They have continued to stir up FUD about the 'safety' of the now-PJB only infrastructure, on the basis of PJB supposedly having signed an agreement with Wizden that required her to transfer control of all assets. No evidence of that has been posted anywhere as far as I know.
+- Days later Wizden retracted that claim.
 
-I do not believe Wizden has acted in good faith, but regardless of whether either side was in the right I do not think either side has any interest in malicious actions towards forks or players. With that being said, the rest of this document will explain SS14 authentication and its security implications. PRs are welcome for cases not considered, or inaccuracies.
+Regardless of which side may have been in the right, I do not think anyone has any interest in malicious actions towards forks or players. With that being said, the rest of this document will explain SS14 authentication and its security implications. PRs are welcome for cases not considered, or inaccuracies.
 
 ## Brief overview of SS14 auth
 
