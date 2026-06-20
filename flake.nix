@@ -29,11 +29,12 @@
             fenixPkgs.stable.clippy
             fenixPkgs.stable.rust-analyzer
             fenixPkgs.targets."x86_64-pc-windows-gnu".stable.rust-std
+            fenixPkgs.targets."x86_64-unknown-linux-musl".stable.rust-std
           ];
 
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
-          # linux/macos
+          # linux/macos native nix
           commonArgs = {
             src = craneLib.cleanCargoSource ./.;
             strictDeps = true;
@@ -44,6 +45,26 @@
 
           cargoArtifacts = craneLib.buildDepsOnly commonArgs;
           multiauth14 = craneLib.buildPackage (commonArgs // { inherit cargoArtifacts; });
+
+          # linux musl static build
+          musl = pkgs.pkgsCross.musl64;
+
+          muslArgs = commonArgs // {
+            CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
+            CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER = "${musl.stdenv.cc}/bin/x86_64-unknown-linux-musl-gcc";
+
+            TARGET_CC = "${musl.stdenv.cc}/bin/x86_64-unknown-linux-musl-gcc";
+            CC_x86_64_unknown_linux_musl = "${musl.stdenv.cc}/bin/x86_64-unknown-linux-musl-gcc";
+            CXX_x86_64_unknown_linux_musl = "${musl.stdenv.cc}/bin/x86_64-unknown-linux-musl-g++";
+
+            depsBuildBuild = (commonArgs.depsBuildBuild or []) ++ [
+              musl.stdenv.cc
+            ];
+          };
+
+          multiauth14-musl = craneLib.buildPackage (muslArgs // {
+            cargoArtifacts = craneLib.buildDepsOnly muslArgs;
+          });
 
           # windows cross compilation
           mingw = pkgs.pkgsCross.mingwW64;
@@ -74,7 +95,7 @@
           });
         in {
           default = multiauth14;
-          inherit multiauth14 multiauth14-windows;
+          inherit multiauth14 multiauth14-musl multiauth14-windows;
         }
       );
 
@@ -91,6 +112,7 @@
             fenixPkgs.stable.clippy
             fenixPkgs.stable.rust-analyzer
             fenixPkgs.targets."x86_64-pc-windows-gnu".stable.rust-std
+            fenixPkgs.targets."x86_64-unknown-linux-musl".stable.rust-std
           ];
 
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;

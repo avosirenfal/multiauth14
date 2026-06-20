@@ -20,7 +20,7 @@ jobs:
         include:
           # linux
           - os: ubuntu-latest
-            nix_target: multiauth14
+            nix_target: multiauth14-musl
             target_name: multiauth14-x86_64-linux
 
           # windows
