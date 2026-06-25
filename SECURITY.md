@@ -1,25 +1,6 @@
 # Tl;dr;
 
-In short, if you trust both auth servers, you have nothing to worry about. I believe it is reasonable to trust both auth servers for the moment.
-
-## Why's that?
-
-As far as I know, PJB did not ban anyone from SS14 itself prior to the auth split nor has she ever been accused of malicious behavior by even her most ardent detractors. If you trusted PJB for the last nine years, I do not see any reason to not trust her now as far as security is concerned.
-
-It is not immediately clear who is responsible for Wizden's new auth infrastructure, or who has access to it. PJB has accused Wizden of exfiltrating SS14's account database *after* she had revoked their access to the server. As best I can tell, events went like this:
-
-- PJB has always been the person who actually pays for SS14's infrastructure, though the funds come out of the SS14 Patreon. Therefore, naturally, PJB has access to these servers - she is the financially responsible party from the perspective of Hetzner, the hosting company.
-- In addition to PJB other Wizden staff (unclear who) had authorized access to the *servers* for a long time, but not the account with Hetzner.
-- Wizden and PJB were, apparently, in negotiation over PJB retiring from the project.
-- PJB had set a deadline: the auth infrastructure would be deleted *at the end of 2026* if no suitable keyholder could be mutually agreed on, for the sake of responsible stewardship over sensitive user data (emails, hashed passwords).
-- Wizden, at some point, revoked PJB's access from the auth servers over fear that she would unilaterally delete auth without warning. I have not seen any explanation for why this was an immediate concern.
-- PJB restored her own access and removed all the access of all other parties using her Hetzner account to access rescue mode on the servers. Wizden surely knew this was possible, since PJB is the responsible party with Hetzner.
-- At this point, some member of Wizden apparently made a copy of the SS14 user database despite their SSH access having been revoked.
-- Not knowing how that was done, PJB considered the servers compromised and shut all SS14 infrastructure down, and restored the servers from clean backups.
-- Wizden claimed PJB "deleted everything". PJB's explanation posts were deleted from the SS14 subreddit. PJB had already left the Wizden Discord of her own accord, days or weeks before.
-- Days later Wizden retracted that claim.
-
-Regardless of which side may have been in the right, I do not think anyone has any interest in malicious actions towards forks or players. With that being said, the rest of this document will explain SS14 authentication and its security implications. PRs are welcome for cases not considered, or inaccuracies.
+In short, if you trust all auth servers you're connected to, you have nothing to worry about.
 
 ## Brief overview of SS14 auth
 
@@ -55,10 +36,6 @@ When an authentication is successful the auth server will return a payload to th
   }
 }
 ```
-
-## Current status quo
-
-At present there are exactly two authentication servers, each with a copy of the same database diverging from around 2026-06-05. Any account registered before that date shares the same UUID on both services, and therefore a successful authentication for a given UUID on either auth server will log into the same account on all current SS14 servers that choose to trust both auth providers.
 
 ## Threat: Malicious auth server
 
